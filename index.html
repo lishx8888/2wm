@@ -362,13 +362,9 @@
 
 
         // 生成二维码
-        generateBtn.addEventListener('click', async () => {
+        function generateQRCode() {
             try {
-                let content = '';
-                const type = 'text';
-
-                // 只处理文本类型
-                content = document.getElementById('text-content').value.trim();
+                let content = document.getElementById('text-content').value.trim();
 
                 if (!content) {
                     showWarning('请输入内容');
@@ -383,38 +379,17 @@
                     return;
                 }
 
-                // 计算实际编码长度（考虑中文字符）
-                let encodedLength = 0;
-                for (let i = 0; i < content.length; i++) {
-                    const charCode = content.charCodeAt(i);
-                    if (charCode > 127) {
-                        // 中文字符占用更多空间
-                        encodedLength += 3;
-                    } else {
-                        // 英文字符占用较少空间
-                        encodedLength += 1;
-                    }
-                }
-
-                // 检查编码后的长度
-                if (encodedLength > 800) {
-                    showError('文本内容过长，请减少字数（建议不超过150字）');
-                    generateBtn.innerHTML = '生成二维码';
-                    generateBtn.disabled = false;
-                    return;
-                }
-
                 // 显示加载状态
                 generateBtn.innerHTML = '<span class="loading mr-2"></span>生成中...';
                 generateBtn.disabled = true;
 
-                // 生成二维码
-                const tempDiv = document.createElement('div');
-                tempDiv.style.display = 'none';
-                document.body.appendChild(tempDiv);
-                
+                // 直接在qr-preview容器中生成二维码
                 try {
-                    const qr = new QRCode(tempDiv, {
+                    // 清空预览容器
+                    qrPreview.innerHTML = '';
+                    
+                    // 直接在预览容器中生成二维码
+                    const qr = new QRCode(qrPreview, {
                         text: content,
                         width: 192,
                         height: 192,
@@ -426,16 +401,13 @@
                     // 等待二维码生成完成
                     setTimeout(() => {
                         try {
-                            const img = tempDiv.querySelector('img');
+                            const img = qrPreview.querySelector('img');
                             if (!img) {
                                 throw new Error('二维码图片生成失败');
                             }
                             
-                            // 直接使用图片的src，避免在移动设备上canvas可能的问题
+                            // 直接使用图片的src
                             currentQRCode = img.src;
-                            
-                            // 更新预览
-                            qrPreview.innerHTML = `<img src="${currentQRCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
                             
                             // 添加到历史记录
                             const historyItem = {
@@ -459,35 +431,40 @@
                             }
                             updateHistory();
                             
-                            // 清理临时元素
-                            document.body.removeChild(tempDiv);
-                            
                             // 恢复按钮状态
                             generateBtn.innerHTML = '生成二维码';
                             generateBtn.disabled = false;
+                            
+                            // 显示成功提示
+                            showInfo('二维码生成成功');
                         } catch (innerError) {
                             console.error('处理二维码图片失败:', innerError);
                             showError('生成二维码失败，请重试');
-                            document.body.removeChild(tempDiv);
                             generateBtn.innerHTML = '生成二维码';
                             generateBtn.disabled = false;
                         }
-                    }, 200); // 增加延迟时间，确保在移动设备上有足够时间生成
+                    }, 1000); // 增加延迟时间到1秒，确保在移动设备上有足够时间生成
                 } catch (qrError) {
                     console.error('创建二维码失败:', qrError);
                     showError('生成二维码失败，请重试');
-                    document.body.removeChild(tempDiv);
                     generateBtn.innerHTML = '生成二维码';
                     generateBtn.disabled = false;
                 }
-                
-                return;
             } catch (error) {
                 console.error('生成二维码失败:', error);
                 showError('生成二维码失败，请重试');
                 generateBtn.innerHTML = '生成二维码';
                 generateBtn.disabled = false;
             }
+        }
+        
+        // 绑定点击事件
+        generateBtn.addEventListener('click', generateQRCode);
+        
+        // 为移动设备添加触摸事件支持
+        generateBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            generateQRCode();
         });
 
 
