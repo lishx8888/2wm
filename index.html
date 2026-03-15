@@ -352,19 +352,85 @@
         // 初始化历史记录
         let history = [];
         try {
-            history = JSON.parse(localStorage.getItem('qrCodeHistory') || '[]');
+            // 首先尝试从localStorage读取
+            if (typeof localStorage !== 'undefined') {
+                try {
+                    const storedHistory = localStorage.getItem('qrCodeHistory');
+                    if (storedHistory) {
+                        try {
+                            history = JSON.parse(storedHistory);
+                            // 确保history是数组
+                            if (!Array.isArray(history)) {
+                                history = [];
+                            }
+                            console.log('从localStorage读取历史记录成功:', history.length, '条记录');
+                        } catch (parseError) {
+                            console.error('解析localStorage历史记录失败:', parseError);
+                            history = [];
+                        }
+                    }
+                } catch (localStorageError) {
+                    console.error('读取localStorage失败:', localStorageError);
+                    // 尝试从sessionStorage读取
+                    try {
+                        const storedHistory = sessionStorage.getItem('qrCodeHistory');
+                        if (storedHistory) {
+                            try {
+                                history = JSON.parse(storedHistory);
+                                // 确保history是数组
+                                if (!Array.isArray(history)) {
+                                    history = [];
+                                }
+                                console.log('从sessionStorage读取历史记录成功:', history.length, '条记录');
+                            } catch (parseError) {
+                                console.error('解析sessionStorage历史记录失败:', parseError);
+                                history = [];
+                            }
+                        }
+                    } catch (sessionStorageError) {
+                        console.error('读取sessionStorage失败:', sessionStorageError);
+                        history = [];
+                    }
+                }
+            } else {
+                // localStorage不可用，尝试使用sessionStorage
+                try {
+                    const storedHistory = sessionStorage.getItem('qrCodeHistory');
+                    if (storedHistory) {
+                        try {
+                            history = JSON.parse(storedHistory);
+                            // 确保history是数组
+                            if (!Array.isArray(history)) {
+                                history = [];
+                            }
+                            console.log('从sessionStorage读取历史记录成功:', history.length, '条记录');
+                        } catch (parseError) {
+                            console.error('解析sessionStorage历史记录失败:', parseError);
+                            history = [];
+                        }
+                    }
+                } catch (sessionStorageError) {
+                    console.error('读取sessionStorage失败:', sessionStorageError);
+                    history = [];
+                }
+            }
         } catch (error) {
             console.error('读取历史记录失败:', error);
             history = [];
         }
+        console.log('历史记录初始化完成，当前条数:', history.length);
         updateHistory();
 
 
 
         // 生成二维码
         function generateQRCode() {
+            console.log('开始生成二维码');
             try {
                 let content = document.getElementById('text-content').value.trim();
+                console.log('输入内容:', content);
+                console.log('输入内容长度:', content.length);
+                console.log('输入内容编码:', encodeURIComponent(content));
 
                 if (!content) {
                     showWarning('请输入内容');
@@ -374,87 +440,179 @@
                 // 检查文本长度，QR码有容量限制
                 if (content.length > 200) {
                     showError('文本内容过长，请减少字数（建议不超过200字）');
-                    generateBtn.innerHTML = '生成二维码';
-                    generateBtn.disabled = false;
                     return;
                 }
-
-                // 显示加载状态
-                generateBtn.innerHTML = '<span class="loading mr-2"></span>生成中...';
-                generateBtn.disabled = true;
 
                 // 直接在qr-preview容器中生成二维码
                 try {
                     // 清空预览容器
                     qrPreview.innerHTML = '';
+                    console.log('预览容器已清空');
                     
                     // 直接在预览容器中生成二维码
-                    const qr = new QRCode(qrPreview, {
-                        text: content,
-                        width: 192,
-                        height: 192,
-                        colorDark: '#000000',
-                        colorLight: '#FFFFFF',
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
-                    
+                    console.log('开始创建QRCode实例');
+                    console.log('QRCode库是否可用:', typeof QRCode);
+                    let qr;
+                    try {
+                        // 尝试使用不同的错误校正级别、尺寸和版本
+                        const errorLevels = [QRCode.CorrectLevel.L, QRCode.CorrectLevel.M, QRCode.CorrectLevel.Q, QRCode.CorrectLevel.H];
+                        const sizes = [192, 256, 320, 384];
+                        const typeNumbers = [4, 5, 6, 7, 8, 9, 10]; // 尝试更多版本号
+                        let success = false;
+                        
+                        // 遍历所有尺寸、错误校正级别和版本组合
+                        for (let size of sizes) {
+                            for (let level of errorLevels) {
+                                for (let typeNumber of typeNumbers) {
+                                    try {
+                                        qrPreview.innerHTML = ''; // 清空预览容器
+                                        qr = new QRCode(qrPreview, {
+                                            text: content,
+                                            width: size,
+                                            height: size,
+                                            colorDark: '#000000',
+                                            colorLight: '#FFFFFF',
+                                            correctLevel: level,
+                                            typeNumber: typeNumber // 指定版本号
+                                        });
+                                        console.log('QRCode实例创建成功，使用尺寸:', size, '错误校正级别:', level, '版本:', typeNumber);
+                                        console.log('QRCode实例:', qr);
+                                        success = true;
+                                        break;
+                                    } catch (e) {
+                                        console.warn('使用尺寸', size, '错误校正级别', level, '版本', typeNumber, '创建失败:', e.message);
+                                    }
+                                }
+                                if (success) break;
+                            }
+                            if (success) break;
+                        }
+                        
+                        if (!success) {
+                            // 如果所有尝试都失败，显示友好的错误信息
+                            throw new Error('二维码生成失败：内容过长，请尝试缩短文本长度');
+                        }
+                    } catch (qrCreateError) {
+                        console.error('创建QRCode实例失败:', qrCreateError);
+                        throw qrCreateError;
+                    }
+
                     // 等待二维码生成完成
                     setTimeout(() => {
-                        try {
-                            const img = qrPreview.querySelector('img');
-                            if (!img) {
-                                throw new Error('二维码图片生成失败');
+                        console.log('开始查找二维码元素');
+                        let img = qrPreview.querySelector('img');
+                        let canvas = qrPreview.querySelector('canvas');
+                        console.log('查找生成的图片元素:', img);
+                        console.log('查找生成的canvas元素:', canvas);
+                        console.log('预览容器内容:', qrPreview.innerHTML);
+
+                        if (!img && !canvas) {
+                            // 尝试直接从QRCode实例获取数据
+                            try {
+                                // 检查QRCode实例是否有相关方法
+                                console.log('QRCode实例:', qr);
+                                console.log('QRCode实例方法:', Object.keys(qr));
+                            } catch (e) {
+                                console.error('无法访问QRCode实例:', e);
                             }
-                            
-                            // 直接使用图片的src
+                            throw new Error('二维码生成失败，未找到图片或canvas元素');
+                        }
+
+                        // 直接使用图片的src或从canvas生成data URL
+                        if (img) {
                             currentQRCode = img.src;
-                            
-                            // 添加到历史记录
-                            const historyItem = {
-                                type: '文本二维码',
-                                content: content,
-                                qrCode: currentQRCode,
-                                timestamp: new Date().toLocaleString()
-                            };
-                            
+                            console.log('二维码图片src获取成功');
+                            console.log('图片src长度:', currentQRCode.length);
+                        } else if (canvas) {
+                            try {
+                                currentQRCode = canvas.toDataURL('image/png');
+                                console.log('从canvas生成二维码图片src成功');
+                                console.log('Canvas data URL长度:', currentQRCode.length);
+                            } catch (canvasError) {
+                                console.error('从canvas生成data URL失败:', canvasError);
+                                throw canvasError;
+                            }
+                        }
+
+                        // 添加到历史记录
+                        const historyItem = {
+                            type: '文本二维码',
+                            content: content,
+                            qrCode: currentQRCode,
+                            timestamp: new Date().toLocaleString()
+                        };
+                        console.log('创建历史记录项:', historyItem);
+                        console.log('历史记录项是否包含必要字段:', {
+                            content: !!historyItem.content,
+                            qrCode: !!historyItem.qrCode
+                        });
+
+                        // 确保history是数组
+                        if (!Array.isArray(history)) {
+                            history = [];
+                            console.warn('历史记录不是数组，已重置为空数组');
+                        }
+
+                        // 检查历史记录中是否已存在相同内容
+                        const existingIndex = history.findIndex(item => item && item.content === content);
+                        if (existingIndex !== -1) {
+                            // 如果已存在，更新该项
+                            history[existingIndex] = historyItem;
+                            // 将更新后的项移到最前面
+                            history.unshift(history.splice(existingIndex, 1)[0]);
+                            console.log('历史记录已更新:', history);
+                        } else {
+                            // 如果不存在，添加到最前面
                             history.unshift(historyItem);
                             if (history.length > 3) {
                                 history = history.slice(0, 3);
                             }
-                            
-                            // 保存历史记录
-                            try {
-                                localStorage.setItem('qrCodeHistory', JSON.stringify(history));
-                            } catch (error) {
-                                console.error('保存历史记录失败:', error);
-                                // 即使保存失败，也继续更新UI
-                            }
-                            updateHistory();
-                            
-                            // 恢复按钮状态
-                            generateBtn.innerHTML = '生成二维码';
-                            generateBtn.disabled = false;
-                            
-                            // 显示成功提示
-                            showInfo('二维码生成成功');
-                        } catch (innerError) {
-                            console.error('处理二维码图片失败:', innerError);
-                            showError('生成二维码失败，请重试');
-                            generateBtn.innerHTML = '生成二维码';
-                            generateBtn.disabled = false;
+                            console.log('历史记录已添加:', history);
                         }
-                    }, 1000); // 增加延迟时间到1秒，确保在移动设备上有足够时间生成
+                        console.log('历史记录更新后:', history);
+                        console.log('历史记录更新后长度:', history.length);
+
+                        // 保存历史记录
+                        try {
+                            // 确保数据可以正确序列化
+                            const historyJson = JSON.stringify(history);
+                            console.log('历史记录JSON:', historyJson);
+
+                            // 尝试使用localStorage保存
+                            if (typeof localStorage !== 'undefined') {
+                                try {
+                                    localStorage.setItem('qrCodeHistory', historyJson);
+                                    console.log('历史记录保存成功到localStorage:', history.length, '条记录');
+                                } catch (localStorageError) {
+                                    console.error('localStorage保存失败:', localStorageError);
+                                    // 尝试使用sessionStorage作为备选
+                                    try {
+                                        sessionStorage.setItem('qrCodeHistory', historyJson);
+                                        console.log('历史记录保存成功到sessionStorage:', history.length, '条记录');
+                                    } catch (sessionStorageError) {
+                                        console.error('sessionStorage保存失败:', sessionStorageError);
+                                        // 即使保存失败，也继续更新UI
+                                    }
+                                }
+                            } else {
+                                console.warn('localStorage不可用');
+                            }
+                        } catch (error) {
+                            console.error('保存历史记录失败:', error);
+                            // 即使保存失败，也继续更新UI
+                        }
+
+                        // 强制更新UI
+                        updateHistory();
+                        console.log('历史记录已更新，当前条数:', history.length);
+                    }, 100); // 等待100毫秒，确保二维码生成完成
                 } catch (qrError) {
                     console.error('创建二维码失败:', qrError);
                     showError('生成二维码失败，请重试');
-                    generateBtn.innerHTML = '生成二维码';
-                    generateBtn.disabled = false;
                 }
             } catch (error) {
                 console.error('生成二维码失败:', error);
                 showError('生成二维码失败，请重试');
-                generateBtn.innerHTML = '生成二维码';
-                generateBtn.disabled = false;
             }
         }
         
@@ -471,46 +629,145 @@
 
         // 更新历史记录
         function updateHistory() {
+            console.log('开始更新历史记录，当前历史记录条数:', history.length);
+            
+            // 确保history是数组
+            if (!Array.isArray(history)) {
+                history = [];
+                console.warn('历史记录不是数组，已重置为空数组');
+            }
+            
+            // 过滤掉无效的历史记录项
+            console.log('过滤前历史记录:', history);
+            history = history.filter(item => {
+                const valid = item && item.content;
+                console.log('过滤项:', item, '有效:', valid);
+                return valid;
+            });
+            console.log('过滤后历史记录条数:', history.length);
+            console.log('过滤后历史记录:', history);
+            
             if (history.length === 0) {
+                console.log('历史记录为空，显示空状态');
                 historyEmpty.classList.remove('hidden');
                 historyList.classList.add('hidden');
                 return;
             }
 
+            console.log('历史记录不为空，显示历史记录列表');
             historyEmpty.classList.add('hidden');
             historyList.classList.remove('hidden');
 
             historyList.innerHTML = '';
+            console.log('开始创建历史记录项');
+            console.log('historyList元素:', historyList);
+            
+            // 确保historyList是有效的DOM元素
+            if (!historyList) {
+                console.error('historyList元素不存在');
+                return;
+            }
+            
             history.forEach((item, index) => {
-                const historyItem = document.createElement('div');
-                historyItem.className = 'history-item';
-                historyItem.innerHTML = `
-                    <img src="${item.qrCode}" alt="二维码">
-                    <div class="history-info">
-                        <div class="history-type">${item.type}</div>
-                        <div class="history-content">${item.content}</div>
-                        <div class="history-time">${item.timestamp}</div>
-                    </div>
-                `;
-                historyList.appendChild(historyItem);
+                console.log('处理历史记录项:', index, item);
+                try {
+                    if (!item || !item.content) {
+                        console.warn('跳过无效的历史记录项:', index);
+                        return;
+                    }
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    // 简化历史记录项的HTML，确保即使没有qrCode也能显示
+                    historyItem.innerHTML = `
+                        <div class="w-16 h-16 flex items-center justify-center bg-gray-100 rounded-md">
+                            <i class="fa fa-qrcode text-gray-500"></i>
+                        </div>
+                        <div class="history-info">
+                            <div class="history-type">${item.type || '文本二维码'}</div>
+                            <div class="history-content">${item.content || ''}</div>
+                            <div class="history-time">${item.timestamp || new Date().toLocaleString()}</div>
+                        </div>
+                    `;
+                    
+                    // 尝试添加到DOM
+                    historyList.appendChild(historyItem);
+                    console.log('历史记录项创建成功:', index);
+                    console.log('当前historyList子元素数量:', historyList.children.length);
+                } catch (error) {
+                    console.error('创建历史记录项失败:', error);
+                }
             });
 
-
-
+            console.log('历史记录项创建完成，开始绑定点击事件');
+            console.log('historyList最终子元素数量:', historyList.children.length);
+            
             // 绑定历史记录点击事件
-            document.querySelectorAll('.history-item').forEach((item, index) => {
+            const historyItems = historyList.querySelectorAll('.history-item');
+            console.log('找到历史记录项数量:', historyItems.length);
+            
+            historyItems.forEach((item, index) => {
                 // 使用touchstart和click事件，确保在移动设备上也能正常响应
                 item.addEventListener('click', handleHistoryClick);
                 item.addEventListener('touchstart', handleHistoryClick);
                 
                 function handleHistoryClick() {
-                    const historyItem = history[index];
-                    // 填充文本内容
-                    document.getElementById('text-content').value = historyItem.content;
-                    // 显示二维码
-                    qrPreview.innerHTML = `<img src="${historyItem.qrCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
+                    try {
+                        const historyItem = history[index];
+                        if (!historyItem || !historyItem.content) {
+                            showError('历史记录数据有误');
+                            return;
+                        }
+                        // 填充文本内容
+                        document.getElementById('text-content').value = historyItem.content || '';
+                        // 显示二维码
+                        if (historyItem.qrCode) {
+                            qrPreview.innerHTML = `<img src="${historyItem.qrCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
+                            // 更新当前二维码变量
+                            currentQRCode = historyItem.qrCode;
+                        } else {
+                            // 如果没有qrCode，重新生成二维码
+                            console.log('历史记录项没有qrCode，重新生成');
+                            const content = historyItem.content;
+                            // 清空预览容器
+                            qrPreview.innerHTML = '';
+                            // 重新生成二维码
+                            const qr = new QRCode(qrPreview, {
+                                text: content,
+                                width: 192,
+                                height: 192,
+                                colorDark: '#000000',
+                                colorLight: '#FFFFFF',
+                                correctLevel: QRCode.CorrectLevel.H
+                            });
+                            // 立即获取生成的二维码
+                            const img = qrPreview.querySelector('img');
+                            if (img) {
+                                currentQRCode = img.src;
+                                // 更新历史记录项的qrCode
+                                historyItem.qrCode = currentQRCode;
+                                // 保存历史记录
+                                try {
+                                    const historyJson = JSON.stringify(history);
+                                    if (typeof localStorage !== 'undefined') {
+                                        localStorage.setItem('qrCodeHistory', historyJson);
+                                    } else if (typeof sessionStorage !== 'undefined') {
+                                        sessionStorage.setItem('qrCodeHistory', historyJson);
+                                    }
+                                } catch (error) {
+                                    console.error('保存历史记录失败:', error);
+                                }
+                            }
+                        }
+                        console.log('历史记录点击事件处理成功:', index);
+                    } catch (error) {
+                        console.error('加载历史记录失败:', error);
+                        showError('加载历史记录失败，请重试');
+                    }
                 }
             });
+            
+            console.log('历史记录更新完成');
         }
     </script>
 </body>
