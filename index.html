@@ -350,7 +350,13 @@
         let currentQRCode = '';
 
         // 初始化历史记录
-        let history = JSON.parse(localStorage.getItem('qrCodeHistory') || '[]');
+        let history = [];
+        try {
+            history = JSON.parse(localStorage.getItem('qrCodeHistory') || '[]');
+        } catch (error) {
+            console.error('读取历史记录失败:', error);
+            history = [];
+        }
         updateHistory();
 
 
@@ -407,56 +413,73 @@
                 tempDiv.style.display = 'none';
                 document.body.appendChild(tempDiv);
                 
-                const qr = new QRCode(tempDiv, {
-                    text: content,
-                    width: 192,
-                    height: 192,
-                    colorDark: '#000000',
-                    colorLight: '#FFFFFF',
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-                
-                // 等待二维码生成完成
-                setTimeout(() => {
-                    const img = tempDiv.querySelector('img');
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 192;
-                    canvas.height = 192;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
+                try {
+                    const qr = new QRCode(tempDiv, {
+                        text: content,
+                        width: 192,
+                        height: 192,
+                        colorDark: '#000000',
+                        colorLight: '#FFFFFF',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
                     
-                    // 转换为base64
-                    currentQRCode = canvas.toDataURL('image/png');
-                    
-                    // 更新预览
-                    qrPreview.innerHTML = `<img src="${currentQRCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
-                    
-
-                    
-                    // 添加到历史记录
-                    const historyItem = {
-                        type: '文本二维码',
-                        content: content,
-                        qrCode: currentQRCode,
-                        timestamp: new Date().toLocaleString()
-                    };
-                    
-                    history.unshift(historyItem);
-                if (history.length > 3) {
-                    history = history.slice(0, 3);
-                }
-                    
-                    // 保存历史记录
-                    localStorage.setItem('qrCodeHistory', JSON.stringify(history));
-                    updateHistory();
-                    
-                    // 清理临时元素
+                    // 等待二维码生成完成
+                    setTimeout(() => {
+                        try {
+                            const img = tempDiv.querySelector('img');
+                            if (!img) {
+                                throw new Error('二维码图片生成失败');
+                            }
+                            
+                            // 直接使用图片的src，避免在移动设备上canvas可能的问题
+                            currentQRCode = img.src;
+                            
+                            // 更新预览
+                            qrPreview.innerHTML = `<img src="${currentQRCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
+                            
+                            // 添加到历史记录
+                            const historyItem = {
+                                type: '文本二维码',
+                                content: content,
+                                qrCode: currentQRCode,
+                                timestamp: new Date().toLocaleString()
+                            };
+                            
+                            history.unshift(historyItem);
+                            if (history.length > 3) {
+                                history = history.slice(0, 3);
+                            }
+                            
+                            // 保存历史记录
+                            try {
+                                localStorage.setItem('qrCodeHistory', JSON.stringify(history));
+                            } catch (error) {
+                                console.error('保存历史记录失败:', error);
+                                // 即使保存失败，也继续更新UI
+                            }
+                            updateHistory();
+                            
+                            // 清理临时元素
+                            document.body.removeChild(tempDiv);
+                            
+                            // 恢复按钮状态
+                            generateBtn.innerHTML = '生成二维码';
+                            generateBtn.disabled = false;
+                        } catch (innerError) {
+                            console.error('处理二维码图片失败:', innerError);
+                            showError('生成二维码失败，请重试');
+                            document.body.removeChild(tempDiv);
+                            generateBtn.innerHTML = '生成二维码';
+                            generateBtn.disabled = false;
+                        }
+                    }, 200); // 增加延迟时间，确保在移动设备上有足够时间生成
+                } catch (qrError) {
+                    console.error('创建二维码失败:', qrError);
+                    showError('生成二维码失败，请重试');
                     document.body.removeChild(tempDiv);
-                    
-                    // 恢复按钮状态
                     generateBtn.innerHTML = '生成二维码';
                     generateBtn.disabled = false;
-                }, 100);
+                }
                 
                 return;
             } catch (error) {
@@ -499,13 +522,17 @@
 
             // 绑定历史记录点击事件
             document.querySelectorAll('.history-item').forEach((item, index) => {
-                item.addEventListener('click', () => {
+                // 使用touchstart和click事件，确保在移动设备上也能正常响应
+                item.addEventListener('click', handleHistoryClick);
+                item.addEventListener('touchstart', handleHistoryClick);
+                
+                function handleHistoryClick() {
                     const historyItem = history[index];
                     // 填充文本内容
                     document.getElementById('text-content').value = historyItem.content;
                     // 显示二维码
-                    qrPreview.innerHTML = `<img src="${historyItem.qrCode}" alt="二维码" class="rounded-md">`;
-                });
+                    qrPreview.innerHTML = `<img src="${historyItem.qrCode}" alt="二维码" class="w-48 h-48 object-cover rounded-md">`;
+                }
             });
         }
     </script>
