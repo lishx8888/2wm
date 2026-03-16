@@ -457,13 +457,14 @@
                         // 尝试使用不同的错误校正级别、尺寸和版本
                         const errorLevels = [QRCode.CorrectLevel.L, QRCode.CorrectLevel.M, QRCode.CorrectLevel.Q, QRCode.CorrectLevel.H];
                         const sizes = [192, 256, 320, 384];
-                        const typeNumbers = [4, 5, 6, 7, 8, 9, 10]; // 尝试更多版本号
+                        const typeNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // 尝试更多版本号
                         let success = false;
                         
-                        // 遍历所有尺寸、错误校正级别和版本组合
-                        for (let size of sizes) {
-                            for (let level of errorLevels) {
-                                for (let typeNumber of typeNumbers) {
+                        // 遍历所有错误校正级别、版本和尺寸组合
+                        // 先尝试低错误校正级别和高版本号，因为它们能容纳更多数据
+                        for (let level of errorLevels) {
+                            for (let typeNumber of typeNumbers) {
+                                for (let size of sizes) {
                                     try {
                                         qrPreview.innerHTML = ''; // 清空预览容器
                                         qr = new QRCode(qrPreview, {
@@ -475,12 +476,12 @@
                                             correctLevel: level,
                                             typeNumber: typeNumber // 指定版本号
                                         });
-                                        console.log('QRCode实例创建成功，使用尺寸:', size, '错误校正级别:', level, '版本:', typeNumber);
+                                        console.log('QRCode实例创建成功，使用错误校正级别:', level, '版本:', typeNumber, '尺寸:', size);
                                         console.log('QRCode实例:', qr);
                                         success = true;
                                         break;
                                     } catch (e) {
-                                        console.warn('使用尺寸', size, '错误校正级别', level, '版本', typeNumber, '创建失败:', e.message);
+                                        console.warn('使用错误校正级别', level, '版本', typeNumber, '尺寸', size, '创建失败:', e.message);
                                     }
                                 }
                                 if (success) break;
