@@ -23,10 +23,23 @@
         }
 
         /* 通用样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+        
         body {
             font-family: 'Inter', system-ui, sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
+            position: relative;
+            min-height: 100vh;
         }
 
         /* 按钮样式 */
@@ -232,7 +245,7 @@
 <body>
 
 
-    <div class="min-h-screen flex flex-col">
+    <div style="padding-bottom: 60px;">
         <!-- 顶部导航 -->
         <header class="bg-white shadow-sm">
             <div class="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -240,7 +253,7 @@
         </header>
 
         <!-- 主内容区 -->
-        <main class="flex-grow container mx-auto px-4 py-8">
+        <main class="container mx-auto px-4 py-8">
             <!-- 文本转换区 -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- 文本转换表单 -->
@@ -288,14 +301,14 @@
                 </div>
             </div>
         </main>
-
-        <!-- 底部信息 -->
-        <footer class="bg-white shadow-sm mt-8">
-            <div class="container mx-auto px-4 py-4 text-center text-gray-500 text-sm">
-                <p>© 2026 二维码生成器 | lishx8888版权所有</p>
-            </div>
-        </footer>
     </div>
+
+    <!-- 底部信息 -->
+    <footer class="bg-white shadow-sm" style="position: absolute; bottom: 0; left: 0; right: 0;">
+        <div class="container mx-auto px-4 py-4 text-center text-gray-500 text-sm">
+            <p>© 2026 二维码生成器 | lishx8888版权所有</p>
+        </div>
+    </footer>
 
     <!-- 主逻辑 -->
     <script>
