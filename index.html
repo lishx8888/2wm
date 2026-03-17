@@ -454,162 +454,135 @@
                     qrPreview.innerHTML = '';
                     console.log('预览容器已清空');
                     
-                    // 直接在预览容器中生成二维码
-                    console.log('开始创建QRCode实例');
-                    console.log('QRCode库是否可用:', typeof QRCode);
-                    let qr;
-                    try {
-                        // 尝试使用不同的错误校正级别、尺寸和版本
-                        const errorLevels = [QRCode.CorrectLevel.L, QRCode.CorrectLevel.M, QRCode.CorrectLevel.Q, QRCode.CorrectLevel.H];
-                        const sizes = [192, 256, 320, 384];
-                        const typeNumbers = [4, 5, 6, 7, 8, 9, 10]; // 尝试更多版本号
-                        let success = false;
-                        
-                        // 遍历所有尺寸、错误校正级别和版本组合
-                        for (let size of sizes) {
-                            for (let level of errorLevels) {
-                                for (let typeNumber of typeNumbers) {
-                                    try {
-                                        qrPreview.innerHTML = ''; // 清空预览容器
-                                        qr = new QRCode(qrPreview, {
-                                            text: content,
-                                            width: size,
-                                            height: size,
-                                            colorDark: '#000000',
-                                            colorLight: '#FFFFFF',
-                                            correctLevel: level,
-                                            typeNumber: typeNumber // 指定版本号
-                                        });
-                                        console.log('QRCode实例创建成功，使用尺寸:', size, '错误校正级别:', level, '版本:', typeNumber);
-                                        console.log('QRCode实例:', qr);
-                                        success = true;
-                                        break;
-                                    } catch (e) {
-                                        console.warn('使用尺寸', size, '错误校正级别', level, '版本', typeNumber, '创建失败:', e.message);
-                                    }
+                    // 创建一个临时的div容器
+                    const tempContainer = document.createElement('div');
+                    
+                    // 尝试使用不同的错误校正级别和尺寸
+                    const errorLevels = [QRCode.CorrectLevel.L, QRCode.CorrectLevel.M, QRCode.CorrectLevel.Q, QRCode.CorrectLevel.H];
+                    const sizes = [256, 320, 384];
+                    let success = false;
+                    
+                    for (let size of sizes) {
+                        for (let level of errorLevels) {
+                            try {
+                                // 清空临时容器
+                                tempContainer.innerHTML = '';
+                                
+                                // 创建QRCode实例
+                                const qr = new QRCode(tempContainer, {
+                                    text: content,
+                                    width: size,
+                                    height: size,
+                                    colorDark: '#000000',
+                                    colorLight: '#FFFFFF',
+                                    correctLevel: level
+                                });
+                                
+                                // 查找生成的canvas元素
+                                const canvas = tempContainer.querySelector('canvas');
+                                if (canvas) {
+                                    // 生成data URL
+                                    currentQRCode = canvas.toDataURL('image/png');
+                                    console.log('从canvas生成二维码图片src成功');
+                                    console.log('Canvas data URL长度:', currentQRCode.length);
+                                    
+                                    // 创建一个新的img元素，用于显示和长按保存
+                                    const newImg = document.createElement('img');
+                                    newImg.src = currentQRCode;
+                                    newImg.alt = 'QR Code';
+                                    newImg.style.width = '192px';
+                                    newImg.style.height = '192px';
+                                    newImg.style.userSelect = 'none';
+                                    newImg.style.pointerEvents = 'auto';
+                                    newImg.style.display = 'block';
+                                    newImg.style.margin = '0 auto';
+                                    
+                                    // 清空预览容器并添加新的img元素
+                                    qrPreview.innerHTML = '';
+                                    qrPreview.appendChild(newImg);
+                                    console.log('已替换为可长按保存的图片元素');
+                                    
+                                    success = true;
+                                    break;
                                 }
-                                if (success) break;
+                            } catch (e) {
+                                console.warn('使用尺寸', size, '错误校正级别', level, '创建失败:', e.message);
                             }
-                            if (success) break;
                         }
-                        
-                        if (!success) {
-                            // 如果所有尝试都失败，显示友好的错误信息
-                            throw new Error('二维码生成失败：内容过长，请尝试缩短文本长度');
-                        }
-                    } catch (qrCreateError) {
-                        console.error('创建QRCode实例失败:', qrCreateError);
-                        throw qrCreateError;
+                        if (success) break;
+                    }
+                    
+                    if (!success) {
+                        // 如果所有尝试都失败，显示友好的错误信息
+                        throw new Error('二维码生成失败：内容过长，请尝试缩短文本长度');
                     }
 
-                    // 等待二维码生成完成
-                    setTimeout(() => {
-                        console.log('开始查找二维码元素');
-                        let img = qrPreview.querySelector('img');
-                        let canvas = qrPreview.querySelector('canvas');
-                        console.log('查找生成的图片元素:', img);
-                        console.log('查找生成的canvas元素:', canvas);
-                        console.log('预览容器内容:', qrPreview.innerHTML);
+                    // 确保currentQRCode有值
+                    if (!currentQRCode) {
+                        throw new Error('二维码生成失败，无法获取图片数据');
+                    }
 
-                        if (!img && !canvas) {
-                            // 尝试直接从QRCode实例获取数据
+                    // 添加到历史记录
+                    const historyItem = {
+                        content: content,
+                        qrCode: currentQRCode,
+                        timestamp: new Date().toLocaleString()
+                    };
+                    console.log('创建历史记录项:', historyItem);
+                    
+                    // 确保history是数组
+                    if (!Array.isArray(history)) {
+                        history = [];
+                        console.warn('历史记录不是数组，已重置为空数组');
+                    }
+
+                    // 检查历史记录中是否已存在相同内容
+                    const existingIndex = history.findIndex(item => item && item.content === content);
+                    if (existingIndex !== -1) {
+                        // 如果已存在，更新该项
+                        history[existingIndex] = historyItem;
+                        // 将更新后的项移到最前面
+                        history.unshift(history.splice(existingIndex, 1)[0]);
+                        console.log('历史记录已更新:', history);
+                    } else {
+                        // 如果不存在，添加到最前面
+                        history.unshift(historyItem);
+                        if (history.length > 3) {
+                            history = history.slice(0, 3);
+                        }
+                        console.log('历史记录已添加:', history);
+                    }
+                    
+                    // 保存历史记录
+                    try {
+                        const historyJson = JSON.stringify(history);
+                        console.log('历史记录JSON:', historyJson);
+
+                        // 尝试使用localStorage保存
+                        if (typeof localStorage !== 'undefined') {
                             try {
-                                // 检查QRCode实例是否有相关方法
-                                console.log('QRCode实例:', qr);
-                                console.log('QRCode实例方法:', Object.keys(qr));
-                            } catch (e) {
-                                console.error('无法访问QRCode实例:', e);
-                            }
-                            throw new Error('二维码生成失败，未找到图片或canvas元素');
-                        }
-
-                        // 直接使用图片的src或从canvas生成data URL
-                        if (img) {
-                            currentQRCode = img.src;
-                            console.log('二维码图片src获取成功');
-                            console.log('图片src长度:', currentQRCode.length);
-                        } else if (canvas) {
-                            try {
-                                currentQRCode = canvas.toDataURL('image/png');
-                                console.log('从canvas生成二维码图片src成功');
-                                console.log('Canvas data URL长度:', currentQRCode.length);
-                            } catch (canvasError) {
-                                console.error('从canvas生成data URL失败:', canvasError);
-                                throw canvasError;
-                            }
-                        }
-
-                        // 添加到历史记录
-                        const historyItem = {
-                            content: content,
-                            qrCode: currentQRCode,
-                            timestamp: new Date().toLocaleString()
-                        };
-                        console.log('创建历史记录项:', historyItem);
-                        console.log('历史记录项是否包含必要字段:', {
-                            content: !!historyItem.content,
-                            qrCode: !!historyItem.qrCode
-                        });
-
-                        // 确保history是数组
-                        if (!Array.isArray(history)) {
-                            history = [];
-                            console.warn('历史记录不是数组，已重置为空数组');
-                        }
-
-                        // 检查历史记录中是否已存在相同内容
-                        const existingIndex = history.findIndex(item => item && item.content === content);
-                        if (existingIndex !== -1) {
-                            // 如果已存在，更新该项
-                            history[existingIndex] = historyItem;
-                            // 将更新后的项移到最前面
-                            history.unshift(history.splice(existingIndex, 1)[0]);
-                            console.log('历史记录已更新:', history);
-                        } else {
-                            // 如果不存在，添加到最前面
-                            history.unshift(historyItem);
-                            if (history.length > 3) {
-                                history = history.slice(0, 3);
-                            }
-                            console.log('历史记录已添加:', history);
-                        }
-                        console.log('历史记录更新后:', history);
-                        console.log('历史记录更新后长度:', history.length);
-
-                        // 保存历史记录
-                        try {
-                            // 确保数据可以正确序列化
-                            const historyJson = JSON.stringify(history);
-                            console.log('历史记录JSON:', historyJson);
-
-                            // 尝试使用localStorage保存
-                            if (typeof localStorage !== 'undefined') {
+                                localStorage.setItem('qrCodeHistory', historyJson);
+                                console.log('历史记录保存成功到localStorage:', history.length, '条记录');
+                            } catch (localStorageError) {
+                                console.error('localStorage保存失败:', localStorageError);
+                                // 尝试使用sessionStorage作为备选
                                 try {
-                                    localStorage.setItem('qrCodeHistory', historyJson);
-                                    console.log('历史记录保存成功到localStorage:', history.length, '条记录');
-                                } catch (localStorageError) {
-                                    console.error('localStorage保存失败:', localStorageError);
-                                    // 尝试使用sessionStorage作为备选
-                                    try {
-                                        sessionStorage.setItem('qrCodeHistory', historyJson);
-                                        console.log('历史记录保存成功到sessionStorage:', history.length, '条记录');
-                                    } catch (sessionStorageError) {
-                                        console.error('sessionStorage保存失败:', sessionStorageError);
-                                        // 即使保存失败，也继续更新UI
-                                    }
+                                    sessionStorage.setItem('qrCodeHistory', historyJson);
+                                    console.log('历史记录保存成功到sessionStorage:', history.length, '条记录');
+                                } catch (sessionStorageError) {
+                                    console.error('sessionStorage保存失败:', sessionStorageError);
                                 }
-                            } else {
-                                console.warn('localStorage不可用');
                             }
-                        } catch (error) {
-                            console.error('保存历史记录失败:', error);
-                            // 即使保存失败，也继续更新UI
+                        } else {
+                            console.warn('localStorage不可用');
                         }
+                    } catch (error) {
+                        console.error('保存历史记录失败:', error);
+                    }
 
-                        // 强制更新UI
-                        updateHistory();
-                        console.log('历史记录已更新，当前条数:', history.length);
-                    }, 100); // 等待100毫秒，确保二维码生成完成
+                    // 强制更新UI
+                    updateHistory();
+                    console.log('历史记录已更新，当前条数:', history.length);
                 } catch (qrError) {
                     console.error('创建二维码失败:', qrError);
                     showError('生成二维码失败，请重试');
